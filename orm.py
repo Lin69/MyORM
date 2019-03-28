@@ -10,31 +10,31 @@ conn = psycopg2.connect(
 )
 cor = conn.cursor()
 
-TableList = []
-AttrNames = {}
+# TableList = []
+# AttrNames = {}
 # defaultdict(list)
 
-def connet():
-    global TableList
-    cor.execute("select table_name from information_schema.tables where table_schema='public';")
-    TableList = [k[0] for k in cor]
+# def connet():
+#     global TableList
+#     cor.execute("select table_name from information_schema.tables where table_schema='public';")
+#     TableList = [k[0] for k in cor]
 
-    cor.execute("select table_name, column_name from information_schema.columns where table_schema='public';")
+#     cor.execute("select table_name, column_name from information_schema.columns where table_schema='public';")
 
-    global AttrNames
+#     global AttrNames
 
-    for k, v in cor:
-        if k in AttrNames.keys():
-            AttrNames[k].append(v)
-        else:
-            alst = [v]
-            AttrNames = {k:alst}
+#     for k, v in cor:
+#         if k in AttrNames.keys():
+#             AttrNames[k].append(v)
+#         else:
+#             alst = [v]
+#             AttrNames = {k:alst}
     
 
-connet()
+# connet()
 
-print('tab', TableList)
-print ('attr', AttrNames)
+# print('tab', TableList)
+# print ('attr', AttrNames)
 
 class Field():
     
@@ -105,13 +105,55 @@ class MetaModel(type):
         namespace['_fields'] = fields
         namespace['_table_name'] = meta.table_name
 
+        # Способ 1
+        # if meta.table_name not in TableList:
+        #     print (meta.table_name, 'not in the list')
+        #     todo запрос на создание таблицы
+        # else:
+        #     for f in namespace['_fields'].keys():
+        #         if f not in AttrNames[namespace['_table_name']]:
+        #             print(f, "not in the list of attributes")
+        
+        # Способ 2
+        cor.execute("select table_name from information_schema.tables where table_schema='public';")
+        TableList = [k[0] for k in cor]
 
         if meta.table_name not in TableList:
-            print (meta.table_name, 'not in the list')
+            st = 'CREATE TABLE '+namespace['_table_name']+' ('
+            stlist = []
+            for i in namespace['_fields'].keys():
+                ss = i
+                if isinstance(namespace[i],IntField):
+                    typ = 'integer'
+                else: 
+                    # isinstance(namespace[f],StringField):
+                    typ = 'text'
+                ss += ' '+ typ
+                stlist.append(ss)
+            st += ', '.join(stlist)
+            st += ');'
+            print(st)
+
+            # todo Запрос на создание таблицы
         else:
+            print (f"table {meta.table_name} is in the list")
+
+            cor.execute(f"select column_name from information_schema.columns where table_schema='public' and table_name = '{namespace['_table_name']}';")
+            
+            AttrNames = [k[0] for k in cor]
+            print(AttrNames)
+            
             for f in namespace['_fields'].keys():
-                if f not in AttrNames[namespace['_table_name']]:
-                    print(f, "not in the list of attributes")
+                if f not in AttrNames:
+                    if isinstance(namespace[f],IntField):
+                        typ = 'integer'
+                    else: 
+                        # isinstance(namespace[f],StringField):
+                        typ = 'text'
+                    print(f"ALTER TABLE {namespace['_table_name']} ADD COLUMN {f} {typ};")
+                    # raise AttributeError(f"Attribute {f} is absent in the Database")
+                    #todo запрос на дабвление атрибута
+                    
 
         return super().__new__(mcs, name, bases, namespace)
 
@@ -125,6 +167,7 @@ class Model(metaclass=MetaModel):
 
 class MyClass(Model):
     id = IntField()
+    onemore = StringField();
 
     class Meta:
         table_name = ""
