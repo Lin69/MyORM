@@ -42,19 +42,19 @@ class connection():
             port=port
         )
         self.cur = conn.cursor()
-        self.table_cash = {}
+        self.table_cache = {}
         
         self.cur.execute(f"select table_name, column_name,data_type from information_schema.columns where table_schema='public';")
 
         for i, k, v in self.cur:
-            if i not in self.table_cash.keys():
+            if i not in self.table_cache.keys():
                 dicl={k:v}
-                self.table_cash[i]=dicl
+                self.table_cache[i]=dicl
             else:
-                self.table_cash[i][k]=v
+                self.table_cache[i][k]=v
 
     def create_table(self,*_,table_name,attrs):
-        if table_name not in self.table_cash.keys():
+        if table_name not in self.table_cache.keys():
             st = 'CREATE TABLE '+table_name+' ('
             stlist = []
             for key, value in attrs.items():
@@ -70,14 +70,14 @@ class connection():
             st += ', '.join(stlist)
             st += ');'
             self.cur.execute(st)
-            self.table_cash[table_name]=attrs
+            self.table_cache[table_name]=attrs
 
         else:
             raise ValueError(f"Table {table_name} is already exists")
 
     def delete_table(self,*_, table_name, attrs):
 
-        if table_name in self.table_cash.keys():
+        if table_name in self.table_cache.keys():
             st = 'DROP TABLE '+table_name+";"
             self.cur.execute(st)
         else:
@@ -85,11 +85,11 @@ class connection():
 
     def add_attr(self,*_,table_name,attrs):
 
-        if table_name in self.table_cash.keys():
+        if table_name in self.table_cache.keys():
             stlist = []
             st = 'ALTER TABLE '+table_name
             for key, value in attrs.items():
-                if key not in self.table_cash[table_name]:
+                if key not in self.table_cache[table_name]:
                     if isinstance(value,IntField):
                         typ = 'integer'
                     elif isinstance(value,StringField):
@@ -98,7 +98,7 @@ class connection():
                         typ = value
                         ss = " ADD COLUMN " + key + " "+ typ
                         stlist.append(ss)
-                    self.table_cash[table_name][key]=value
+                    self.table_cache[table_name][key]=value
                 else: 
                     raise ValueError(f"Attibute {key} already exists")
             st += ", ".join(stlist)
@@ -109,14 +109,14 @@ class connection():
 
     def drop_attr(self,*args, table_name):
         
-        if table_name in self.table_cash.keys():
+        if table_name in self.table_cache.keys():
             stlist = []
             st = 'ALTER TABLE '+table_name
             for key in args:
-                if key in self.table_cash[table_name]:
+                if key in self.table_cache[table_name]:
                     ss = " DROP COLUMN IF EXISTS " + key
                     stlist.append(ss)
-                    del self.table_cash[table_name][key]
+                    del self.table_cache[table_name][key]
                 else: 
                     raise ValueError(f"Attibute {key} doesn't exist")
             st += ", ".join(stlist)
@@ -127,14 +127,14 @@ class connection():
 
     def change_table(self,*_,table_name,attrs):
 
-        if table_name in self.table_cash.keys():
+        if table_name in self.table_cache.keys():
             stlist = []
             st = 'ALTER TABLE '+table_name
             for key, value in attrs.items():
-                if key in self.table_cash[table_name]:
+                if key in self.table_cache[table_name]:
                     ss = " ALTER COLUMN " + key + " TYPE "+ value
                     stlist.append(ss)
-                    self.table_cash[table_name][key]=value
+                    self.table_cache[table_name][key]=value
                 else: 
                     raise ValueError(f"Attibute {key} doesn't exist")
             st += ", ".join(stlist)
@@ -248,7 +248,7 @@ class MetaModel(type):
                 if isinstance(value, Field):
                     namespace['_fields'][key]=value
 
-        if meta.table_name not in bd.table_cash.keys():
+        if meta.table_name not in bd.table_cache.keys():
             bd.create_table(table_name=meta.table_name,attrs=namespace['_fields'])
 
         return super().__new__(mcs, name, bases, namespace)
@@ -259,13 +259,19 @@ class Model(metaclass=MetaModel):
         table_name = ""
 
     objects = Manage()
-
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self, *_, **kwargs):
         # self.objects.create(bd,kwargs)
         for field_name, field in self._fields.items():
             value = field.validate(kwargs.get(field_name))
             setattr(self, field_name, value)
-        
+
+
+
+
+# EXAMPLE
+
+
 class MyClass(Model):
 
     id = IntField()
